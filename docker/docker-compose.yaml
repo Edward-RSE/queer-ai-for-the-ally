@@ -1,0 +1,104 @@
+name: queer-ai-for-the-ally
+services:
+  # Chat Interface using Open WebUI - https://openwebui.com/.
+  # Uses PostgreSQL and PGVector for the database backends. Remember to update
+  # CORS_ALLOW_ORIGIN with the hostname.
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:v0.9.6
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - VECTOR_DB=pgvector
+      - CORS_ALLOW_ORIGIN=*
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - open-webui:/app/backend/data
+    restart: unless-stopped
+    networks:
+      - default_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      openwebui-pipeline:
+        condition: service_healthy
+  # Required to enable pipelines in Open WebUI.
+  openwebui-pipeline:
+    image: ghcr.io/open-webui/pipelines:main
+    ports:
+      - "9099:9099"
+    environment:
+      - PIPELINES_API_KEY=0p3n-w3bu!
+    volumes:
+      - pipelines:/app/pipelines
+    restart: unless-stopped
+    networks:
+      - default_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf localhost:9099"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+  # PostgreSQL database to improve the multi-user experience.
+  postgres:
+    image: pgvector/pgvector:pg17
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - default_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+  # Ollama for background task -- small models which fit into the CPU.
+  ollama:
+    image: ollama/ollama:0.15.6
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - default_network
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+  # Short-lived Ollama service to download a small model for Open WebUI background tasks.
+  # Both services use the same volume, so anything pulled here will be available in the
+  # other Ollama service.
+  ollama-pull:
+    container_name: ollama-pull
+    image: ollama/ollama:0.15.6
+    environment:
+      - OLLAMA_HOST=ollama:11434
+    volumes:
+      - ollama:/root/.ollama
+    networks:
+      - default_network
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command: -c "ollama pull gemma3:1b && ollama pull nomic-embed-text:latest"
+volumes:
+  open-webui:
+  postgres:
+  ollama:
+  pipelines:
+networks:
+  default_network:
