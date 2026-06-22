@@ -1,12 +1,27 @@
 name: queer-ai-for-the-ally
 services:
+  # Caddy - used for HTTPS. Should also handle certificate management from Let's
+  # Encrypt with no configuration
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    networks:
+      - default_network
+    depends_on:
+      - openwebui
   # Chat Interface using Open WebUI - https://openwebui.com/.
   # Uses PostgreSQL and PGVector for the database backends. Remember to update
   # CORS_ALLOW_ORIGIN with the hostname.
   openwebui:
     image: ghcr.io/open-webui/open-webui:v0.9.6
-    ports:
-      - "8080:8080"
     env_file:
       - .env
     environment:
@@ -71,10 +86,25 @@ services:
       ollama:
         condition: service_healthy
     entrypoint: /bin/sh
-    command: -c "ollama pull gemma3:1b && ollama pull nomic-embed-text:latest"
+    command: -c "ollama pull gemma3:1b"
 volumes:
   open-webui:
+      driver: local
+      driver_opts:
+        type: none
+        o: bind
+        device: /data/open-webui
   postgres:
+      driver: local
+      driver_opts:
+        type: none
+        o: bind
+        device: /data/postgres
   ollama:
+      driver: local
+      driver_opts:
+        type: none
+        o: bind
+        device: /data/ollama
 networks:
   default_network:
