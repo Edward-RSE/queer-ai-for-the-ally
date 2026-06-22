@@ -106,5 +106,17 @@ volumes:
         type: none
         o: bind
         device: /data/ollama
+  caddy_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/caddy_data
+  caddy_config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/caddy_config
 networks:
   default_network:
