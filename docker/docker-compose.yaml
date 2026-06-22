@@ -10,7 +10,7 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - VECTOR_DB=pgvector
       - CORS_ALLOW_ORIGIN=*
       - OLLAMA_BASE_URL=http://ollama:11434
@@ -24,33 +24,11 @@ services:
         condition: service_healthy
       ollama:
         condition: service_healthy
-      openwebui-pipeline:
-        condition: service_healthy
-  # Required to enable pipelines in Open WebUI.
-  openwebui-pipeline:
-    image: ghcr.io/open-webui/pipelines:main
-    ports:
-      - "9099:9099"
-    environment:
-      - PIPELINES_API_KEY=0p3n-w3bu!
-    volumes:
-      - pipelines:/app/pipelines
-    restart: unless-stopped
-    networks:
-      - default_network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf localhost:9099"]
-      interval: 10s
-      retries: 5
-      start_period: 30s
-      timeout: 10s
   # PostgreSQL database to improve the multi-user experience.
   postgres:
     image: pgvector/pgvector:pg17
     env_file:
       - .env
-    ports:
-      - "5432:5432"
     volumes:
       - postgres:/var/lib/postgresql/data
     restart: unless-stopped
@@ -65,8 +43,6 @@ services:
   # Ollama for background task -- small models which fit into the CPU.
   ollama:
     image: ollama/ollama:0.15.6
-    ports:
-      - "11434:11434"
     volumes:
       - ollama:/root/.ollama
     restart: unless-stopped
@@ -88,6 +64,7 @@ services:
       - OLLAMA_HOST=ollama:11434
     volumes:
       - ollama:/root/.ollama
+    restart: no
     networks:
       - default_network
     depends_on:
@@ -99,6 +76,5 @@ volumes:
   open-webui:
   postgres:
   ollama:
-  pipelines:
 networks:
   default_network:
